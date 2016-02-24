@@ -13,6 +13,8 @@ int Client(int port){
 	struct hostent *server;
 	char *buf;
 	char buffer[1000],readbuff[100000],writebuff[1000];
+	//printf("Enter client port\n");
+	//scanf("%d",&port);
 	sockfd=socket(AF_INET,SOCK_STREAM,0);  //create socket
 	if(sockfd<0){
 		printf("Error creating socket\n");
@@ -34,9 +36,9 @@ int Client(int port){
 	bzero(&(server_addr.sin_zero),8);
 	//connect
 	printf("Connecting.....\n");
-	if(connect(sockfd,(struct sockaddr*)&server_addr,sizeof(server_addr))<0){
-		printf("Error Connecting\n");
-		return -1;
+	while(connect(sockfd,(struct sockaddr*)&server_addr,sizeof(server_addr))<0){
+		//printf("Connecting...\n");
+		continue;
 	}
 	printf("Connected\n");
 	while((buf = readline("\n >>"))!=NULL){

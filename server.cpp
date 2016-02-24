@@ -16,6 +16,8 @@ int Server(int port){
 	struct sockaddr_in server,client;
 	char buffer[1000],writebuff[100000],readbuff[1000],result[100];;
 	//create new socket
+	//printf("Enter server port\n");
+	//scanf("%d",&port);
 	sockfd=socket(AF_INET,SOCK_STREAM,0);
 	if(sockfd<0){
 		printf("Error creating socket\n");
@@ -51,10 +53,10 @@ int Server(int port){
 	while(1){
 		bzero(readbuff,1000);
 		if(read(connfd,readbuff,1000)<=0){
-			printf("Read error\n");
-			exit(-1);
+			//printf("Read error\n");
+			break;
 		}
-		printf("%s\n",readbuff);
+		//printf("%s\n",readbuff);
 		bzero(writebuff,100000);
 		//printf("%d\n",(int)strlen(readbuff));
 		char* Token = strtok(readbuff,DELIM);
@@ -154,6 +156,10 @@ int Server(int port){
 				exit(-1);
 			}
 		}
+		fflush(stdout);
+		bzero(writebuff,100000);
+		bzero(readbuff,1000);
+		//while(read(connfd,readbuff,sizeof(readbuff))<=0);
 
 	}
 	close(connfd);

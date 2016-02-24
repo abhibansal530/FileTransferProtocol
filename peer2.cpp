@@ -3,11 +3,10 @@
 #include <unistd.h>
 int main(int argc , char *argv[]){
 	pid_t pid;
-	int port = 8000;
 	pid=fork();
 	if(pid==0)
-		int c = Client(port);
+		int c = Client(8000);
 	else if(pid)
-		int s = Server(port);
+		int s = Server(8001);
 	return 0;
 }
