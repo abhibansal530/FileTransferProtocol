@@ -91,8 +91,10 @@ int Server(int port){
 			}
 		}
 		else if(strcmp(Token,"FileDownload")==0){
+			char fname[100],protocol[10];
 			Token = strtok(NULL,DELIM);
-			char fname[100];
+			strcpy(protocol,Token);
+			Token = strtok(NULL,DELIM);
 			strcpy(fname,Token);
 			//printf("Download requested : %s\n",fname );
 			FILE *fp = fopen(Token,"rb");
@@ -101,34 +103,64 @@ int Server(int port){
 				exit(-1);
 			}
 			int size = filesize(Token);
-			//time_t ti = findtime(Token);
-			sprintf(result,"%d",size);
-			//printf("%s\n",result );
-			if(write(connfd,result,strlen(result))<0){
-				printf("Error writing\n");
-				exit(-1);
+			if(strcmp(protocol,"UDP")==0){                    //create an udp socket
+				int udpfd;
+				socklen_t len;
+				struct sockaddr_in serv_addr,cli_addr;
+				udpfd = socket(AF_INET,SOCK_DGRAM,0);
+				if(udpfd<0){
+					printf("Socket create error server\n");
+					exit(-1);
+				}
+				else printf("Socket created server\n");
+				bzero(&serv_addr,sizeof(serv_addr));
+				bzero(buffer,1000);
+				serv_addr.sin_family = AF_INET;
+				serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+				serv_addr.sin_port = htons(5000);
+				bind(udpfd,(struct sockaddr*)&serv_addr,sizeof(serv_addr));
+				len = sizeof(cli_addr);
+				recvfrom(udpfd,buffer,1000,0,(struct sockaddr*)&cli_addr,&len);
+				printf("%s\n",buffer );
+				bzero(buffer,1000);
+				while(1){
+					int bytes_read = fread(buffer,1,1000,fp);
+					printf("udp read:%d\n",bytes_read );
+					if(bytes_read<=0)break;
+					sendto(udpfd,buffer,bytes_read,0,(struct sockaddr*)&cli_addr,len);
+				}
+				close(udpfd);
+				
 			}
-			bzero(readbuff,1000);
-			if(read(connfd,readbuff,1000)<=0){
-				printf("Read error\n");
-				exit(-1);
-			}
-			//printf("%s\n",readbuff);
-			if(strcmp(readbuff,"N")==0)continue;
-			printf("download accepted\n");
-			int bytes_read;
-			bzero(buffer,1000);
-			while((bytes_read = fread(buffer,1,1000,fp))>0){
-				char *p = buffer;
-				while(bytes_read>0){
-					int bytes_written = write(connfd,buffer,bytes_read);
-					if(bytes_written<=0){
-						printf("Error writing to socket\n");
-						exit(-1);
+			else{
+				sprintf(result,"%d",size);
+				//printf("%s\n",result );
+				if(write(connfd,result,strlen(result))<0){
+					printf("Error writing\n");
+					exit(-1);
+				}
+				bzero(readbuff,1000);
+				if(read(connfd,readbuff,1000)<=0){
+					printf("Read error\n");
+					exit(-1);
+				}
+				//printf("%s\n",readbuff);
+				if(strcmp(readbuff,"N")==0)continue;
+				printf("download accepted\n");
+				int bytes_read;
+				bzero(buffer,1000);
+				while((bytes_read = fread(buffer,1,1000,fp))>0){
+					char *p = buffer;
+					while(bytes_read>0){
+						int bytes_written = write(connfd,buffer,bytes_read);
+						if(bytes_written<=0){
+							printf("Error writing to socket\n");
+							exit(-1);
+						}
+						//printf("written:%d\n",bytes_written );
+						bytes_read-=bytes_written;
+						p+=bytes_written;
 					}
-					//printf("written:%d\n",bytes_written );
-					bytes_read-=bytes_written;
-					p+=bytes_written;
 				}
 			}
 			fclose(fp);

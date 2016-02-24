@@ -55,37 +55,68 @@ int Client(int port){
 		}
 		char* tok = strtok(writebuff," \t\r\n");
 		if(strcmp(tok,"FileDownload")==0){
+			char fname[100],protocol[10];
 			tok = strtok(NULL," \t\r\n");
-			FILE *f = fopen("try","w+");
+			strcpy(protocol,tok);
+			tok = strtok(NULL," \t\r\n");
+			strcpy(fname,tok);
+			strcat(fname,"_downloaded");
+			FILE *f = fopen(fname,"w+");
 			if(!f){
 				printf("file open error\n");
 				exit(-1);
 			}
-			bzero(readbuff,100000);
-			if(read(sockfd,readbuff,100000)<0){
-				printf("Read error\n");
-				exit(-1);
+			if(strcmp(protocol,"UDP")==0){
+				int udpfd;
+				struct sockaddr_in serv_addr,cli_addr;
+				udpfd = socket(AF_INET,SOCK_DGRAM,0);
+				if(udpfd<0){
+					printf("Socket not created client\n");
+				}
+				else printf("Socket created client\n");
+				bzero(&serv_addr,sizeof(serv_addr));
+				serv_addr.sin_family = AF_INET;
+				serv_addr.sin_addr.s_addr = INADDR_ANY;
+				serv_addr.sin_port = htons(5000);
+				strcpy(buffer,"UDP connected");
+				sendto(udpfd,buffer,strlen(buffer)+1,0,(struct sockaddr*)&serv_addr,sizeof(struct sockaddr));
+				while(feof(f)==0){
+					bzero(buffer,1000);
+					int r = recvfrom(udpfd,buffer,sizeof(buffer),0,NULL,NULL);
+					printf("udp_recvd : %d\n",r );
+					if(r<=0)break;
+					if(fwrite(buffer,1,r,f)<=0)
+						break;
+
+				}
 			}
-			printf("File size: %d Y/N\n",atoi(readbuff));
-			char c=getchar();
-			sprintf(writebuff,"%c",c);
-			if(write(sockfd,writebuff,strlen(writebuff))<0){
-				printf("Write Error clientt\n");
-				exit(-1);
-			}
-			if(c=='N')continue;
-			int r,size=atoi(readbuff);
-			printf("size:%d\n",size);
-			bzero(buffer,1000);
-			while(size>0){
-				r = read(sockfd,buffer,1000);
-				//printf("read : %d\n",r );
-				if(r<=0)
-					break;
-				if(fwrite(buffer,1,r,f)<=0)
-					break;
-				size-=r;
+			else{
+				bzero(readbuff,100000);
+				if(read(sockfd,readbuff,100000)<0){
+					printf("Read error\n");
+					exit(-1);
+				}
+				printf("File size: %d Y/N\n",atoi(readbuff));
+				char c=getchar();
+				sprintf(writebuff,"%c",c);
+				if(write(sockfd,writebuff,strlen(writebuff))<0){
+					printf("Write Error clientt\n");
+					exit(-1);
+				}
+				if(c=='N')continue;
+				int r,size=atoi(readbuff);
+				printf("size:%d\n",size);
 				bzero(buffer,1000);
+				while(size>0){
+					r = read(sockfd,buffer,1000);
+					//printf("read : %d\n",r );
+					if(r<=0)
+						break;
+					if(fwrite(buffer,1,r,f)<=0)
+						break;
+					size-=r;
+					bzero(buffer,1000);
+				}
 			}
 			fclose(f);
 			printf("File received\n");
