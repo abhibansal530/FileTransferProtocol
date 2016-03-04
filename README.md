@@ -24,6 +24,9 @@ Available Commands:-
 		$> IndexGet --regex .*.cpp
 
 Output:Name,size,timestamp,and type of resulting files.
+
+
+
 2.FileHash flag (args)
 	->To check if any files on the other end has been changed.
 	flag can be --verify,or --checkall.
@@ -36,6 +39,7 @@ Output:Name,size,timestamp,and type of resulting files.
 		$> FileHash --checkall
 		Output:output of 'verify' on every file present.
 
+		
 3.FileDownload flag (args)
 	Used to download files from shared folder from connected user to our folder.
 	flag can be UDP or TCP denoting which protocol to use to download file.
