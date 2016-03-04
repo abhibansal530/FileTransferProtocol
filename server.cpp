@@ -10,7 +10,7 @@
 #define DELIM " \t\r\n"
 using namespace std;
 
-int Server(int port){
+int Server(int port,int updport){
 	int sockfd,connfd;
 	socklen_t cli_len;
 	struct sockaddr_in server,client;
@@ -40,6 +40,27 @@ int Server(int port){
 		return -1;
 	}
 
+	int udpfd;                                 //creaing udp socket
+	socklen_t len;
+	struct sockaddr_in serv_addr,cli_addr;
+	udpfd = socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
+	if(udpfd<0){
+		printf("Socket create error server\n");
+		exit(-1);
+	}
+	else printf("Socket UDP created server\n");
+	bzero(&serv_addr,sizeof(serv_addr));
+	//bzero(buffer,1000);
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	serv_addr.sin_port = htons(updport);
+	if(bind(udpfd,(struct sockaddr*)&serv_addr,sizeof(serv_addr))<0){
+		printf("Error UDP socket bind server = %d:%s\n",errno,strerror(errno));
+		exit(-1);
+	}
+	len = sizeof(cli_addr);
+
+
 	//start listening
 	printf("Listening......\n");
 	listen(sockfd,3);
@@ -60,11 +81,19 @@ int Server(int port){
 		bzero(writebuff,100000);
 		//printf("%d\n",(int)strlen(readbuff));
 		char* Token = strtok(readbuff,DELIM);
-		if(strcmp(Token,"Index")==0){
+		if(strcmp(Token,"IndexGet")==0){
 			int nu = handler(readbuff);
+			if(nu==-1){
+				strcpy(writebuff,"Invalid flag\n");
+				if(write(connfd,writebuff,strlen(writebuff))<0){
+					printf("Error writing\n");
+					exit(-1);
+				}
+				continue;
+			}
 			strcpy(writebuff,"Name       Size        Type       Timestamp\n");
 			for(int i=0;i<nu;++i){
-				sprintf(result,"%s      %d      %s       %s\n",files[i].name,(int)files[i].size,files[i].type,ctime(&files[i].timestamp));
+				sprintf(result,"%s      %lld      %s       %s\n",files[i].name,(long long int)files[i].size,files[i].type,ctime(&files[i].timestamp));
 				strcat(writebuff,result);
 			}
 			if(write(connfd,writebuff,strlen(writebuff))<0){
@@ -74,6 +103,14 @@ int Server(int port){
 		}
 		else if(strcmp(Token,"FileHash")==0){
 			int nu = Hashhandler(readbuff);
+			if(nu==-1){
+				strcpy(writebuff,"Invalid flag\n");
+				if(write(connfd,writebuff,strlen(writebuff))<0){
+					printf("Error writing\n");
+					exit(-1);
+				}
+				continue;
+			}
 			strcpy(writebuff,"Name                    Hash                 LastModified\n");
 			for(int i=0;i<nu;++i){
 				sprintf(result,"%s                       ",files[i].name);
@@ -82,7 +119,7 @@ int Server(int port){
 					sprintf(result,"%x",h[c]);
 					strcat(writebuff,result);	
 				}
-				sprintf(result,"\t %s\n",ctime(&last));
+				sprintf(result,"\t %s\n",ctime(&files[i].timestamp));
 				strcat(writebuff,result);	
 			}
 			if(write(connfd,writebuff,strlen(writebuff))<0){
@@ -102,30 +139,29 @@ int Server(int port){
 				printf("Error openning file\n");
 				exit(-1);
 			}
-			int size = filesize(Token);
-			if(strcmp(protocol,"UDP")==0){                    //create an udp socket
-				int udpfd;
-				socklen_t len;
-				struct sockaddr_in serv_addr,cli_addr;
-				udpfd = socket(AF_INET,SOCK_DGRAM,0);
-				if(udpfd<0){
-					printf("Socket create error server\n");
-					exit(-1);
-				}
-				else printf("Socket created server\n");
-				bzero(&serv_addr,sizeof(serv_addr));
-				bzero(buffer,1000);
-				serv_addr.sin_family = AF_INET;
-				serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-				serv_addr.sin_port = htons(5000);
-				bind(udpfd,(struct sockaddr*)&serv_addr,sizeof(serv_addr));
-				len = sizeof(cli_addr);
+			long long int size = filesize(Token);
+			sprintf(result,"%lld",size);
+			if(write(connfd,result,strlen(result))<0){
+				printf("Error writing\n");
+				exit(-1);
+			}
+			bzero(readbuff,1000);
+			if(read(connfd,readbuff,1000)<=0){
+				printf("Read error\n");
+				exit(-1);
+			}
+			//printf("%s\n",readbuff );
+			if(strcmp(readbuff,"N")==0)continue;
+
+			if(strcmp(protocol,"UDP")==0){                    
+				 bzero(buffer,1000);
 				recvfrom(udpfd,buffer,1000,0,(struct sockaddr*)&cli_addr,&len);
-				printf("%s\n",buffer );
+				//printf("Received\n");
+				//printf("%s\n",buffer );
 				bzero(buffer,1000);
 				while(1){
-					int bytes_read = fread(buffer,1,1000,fp);
-					printf("udp read:%d\n",bytes_read );
+					long long int bytes_read = fread(buffer,1,1000,fp);
+					//printf("udp read:%d\n",bytes_read );
 					if(bytes_read<=0)break;
 					sendto(udpfd,buffer,bytes_read,0,(struct sockaddr*)&cli_addr,len);
 				}
@@ -133,26 +169,12 @@ int Server(int port){
 				
 			}
 			else{
-				sprintf(result,"%d",size);
-				//printf("%s\n",result );
-				if(write(connfd,result,strlen(result))<0){
-					printf("Error writing\n");
-					exit(-1);
-				}
-				bzero(readbuff,1000);
-				if(read(connfd,readbuff,1000)<=0){
-					printf("Read error\n");
-					exit(-1);
-				}
-				//printf("%s\n",readbuff);
-				if(strcmp(readbuff,"N")==0)continue;
-				printf("download accepted\n");
-				int bytes_read;
+				long long int bytes_read;
 				bzero(buffer,1000);
 				while((bytes_read = fread(buffer,1,1000,fp))>0){
 					char *p = buffer;
 					while(bytes_read>0){
-						int bytes_written = write(connfd,buffer,bytes_read);
+						long long int bytes_written = write(connfd,buffer,bytes_read);
 						if(bytes_written<=0){
 							printf("Error writing to socket\n");
 							exit(-1);
@@ -164,12 +186,12 @@ int Server(int port){
 				}
 			}
 			fclose(fp);
-			printf("File sent\n");
+			//printf("File sent\n");
 			bzero(writebuff,100000);
-			printf("%s\n",fname );
+			//printf("%s\n",fname );
 			verify(parse2(fname));
 			sprintf(writebuff,"Name           Size             Timestamp            MD5hash\n");
-			sprintf(result,"%s           %d             %s             ",fname,size,ctime(&last));
+			sprintf(result,"%s           %lld             %s             ",fname,size,ctime(&last));
 			strcat(writebuff,result);
 			for(int c=0;c<MD5_DIGEST_LENGTH;++c){
 				sprintf(result,"%x",h[c]);
@@ -182,7 +204,7 @@ int Server(int port){
 
 		}
 		else {
-			strcpy(writebuff,"Nope");
+			strcpy(writebuff,"Invalid command");
 			if(write(connfd,writebuff,strlen(writebuff))<=0){
 				printf("Error writing to socket\n");
 				exit(-1);

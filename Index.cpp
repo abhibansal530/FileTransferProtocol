@@ -35,7 +35,7 @@ int shortlist(time_t st_time,time_t end_time){
 	while((r = getline(&line,&len,fp))!=-1){
 		time_t ti = findtime(parse2(line));
 		if(difftime(ti,st_time) > 0 && difftime(end_time,ti) > 0){
-			printf("done\n");
+			//printf("done\n");
 			strcpy(files[num].name,line);
 			strcpy(files[num].type,filetype(line));
 			files[num].size = filesize(line);
@@ -69,7 +69,7 @@ int Regex(char* reg){
 	while((r = getline(&line,&len,fp))!=-1){
 		//printf("%s\n",line );
 		if(std::regex_match(parse2(line),re)){
-			printf("match\n");
+			//printf("match\n");
 			strcpy(files[num].name,line);
 			strcpy(files[num].type,filetype(line));
 			files[num].size = filesize(line);
@@ -119,6 +119,7 @@ int IndexGet(){
 }
 int handler(char* cmd){
 	char* tok;
+	struct tm timestamp;
 	tok=strtok(NULL,DELIM);
 	//printf("tok:%s\n",tok );
 	if(!tok){
@@ -131,9 +132,24 @@ int handler(char* cmd){
 	else if(!strcmp(tok,"--shortlist")){
 		time_t st,en;
 		tok=strtok(NULL,DELIM);
-		st = (time_t)atoi(tok);
+		//printf("%s\n",tok );
+		if(strptime(tok,"%d-%b-%Y-%H:%M:%S",&timestamp)!=NULL){
+			st = mktime(&timestamp);
+			if(st<0){
+				printf("error mktime\n");
+				return -1;
+			}
+		}
+		//st = (time_t)atoi(tok);
 		tok=strtok(NULL,DELIM);
-		en = (time_t)atoi(tok);
+		if(strptime(tok,"%d-%m-%Y-%H:%M:%S",&timestamp)!=NULL){
+			en = mktime(&timestamp);
+			if(en<0){
+				printf("error mktime\n");
+				return -1;
+			}
+		}
+		//en = (time_t)atoi(tok);
 		return shortlist(st,en);
 	}
 	else if(!strcmp(tok,"--regex")){
@@ -141,8 +157,8 @@ int handler(char* cmd){
 		return Regex(tok);
 	}
 	else{
-		printf("wrong input\n");
-		return 0;
+		//printf("wrong input\n");
+		return -1;
 		//wrong input
 	}
 }

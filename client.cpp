@@ -7,7 +7,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 using namespace std;
-int Client(int port){
+int Client(int port,int udpport){
 	int sockfd;
 	struct sockaddr_in server_addr;
 	struct hostent *server;
@@ -34,6 +34,20 @@ int Client(int port){
 	//server_addr.sin_addr=*((struct in_addr*)server->h_addr);
 	server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 	bzero(&(server_addr.sin_zero),8);
+
+	int udpfd;                                        //creating udp socket
+	struct sockaddr_in serv_addr,cli_addr;
+	udpfd = socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
+	if(udpfd<0){
+		printf("Socket UDP not created client\n");
+		exit(-1);
+	}
+	//else printf("Socket UDP created client\n");
+	bzero(&serv_addr,sizeof(serv_addr));
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_addr.s_addr = INADDR_ANY;
+	serv_addr.sin_port = htons(udpport);
+
 	//connect
 	printf("Connecting.....\n");
 	while(connect(sockfd,(struct sockaddr*)&server_addr,sizeof(server_addr))<0){
@@ -61,51 +75,49 @@ int Client(int port){
 			tok = strtok(NULL," \t\r\n");
 			strcpy(fname,tok);
 			strcat(fname,"_downloaded");
+			bzero(readbuff,100000);
+			if(read(sockfd,readbuff,100000)<0){
+				printf("Read error\n");
+				exit(-1);
+			}
+			printf("File size: %lld Y/N\n",1ll*atoi(readbuff));
+			char c;
+			scanf("%c",&c);
+			//c=getchar();
+			bzero(writebuff,1000);
+			sprintf(writebuff,"%c",c);
+			if(write(sockfd,writebuff,strlen(writebuff))<0){
+				printf("Write Error clientt\n");
+				exit(-1);
+			}
+			if(c=='N')continue;
 			FILE *f = fopen(fname,"w+");
 			if(!f){
 				printf("file open error\n");
 				exit(-1);
 			}
+
 			if(strcmp(protocol,"UDP")==0){
-				int udpfd;
-				struct sockaddr_in serv_addr,cli_addr;
-				udpfd = socket(AF_INET,SOCK_DGRAM,0);
-				if(udpfd<0){
-					printf("Socket not created client\n");
-				}
-				else printf("Socket created client\n");
-				bzero(&serv_addr,sizeof(serv_addr));
-				serv_addr.sin_family = AF_INET;
-				serv_addr.sin_addr.s_addr = INADDR_ANY;
-				serv_addr.sin_port = htons(5000);
 				strcpy(buffer,"UDP connected");
 				sendto(udpfd,buffer,strlen(buffer)+1,0,(struct sockaddr*)&serv_addr,sizeof(struct sockaddr));
-				while(feof(f)==0){
+				//printf("Sent\n");
+				long long int size = 1ll*atoi(readbuff);
+				while(size>0){
 					bzero(buffer,1000);
-					int r = recvfrom(udpfd,buffer,sizeof(buffer),0,NULL,NULL);
-					printf("udp_recvd : %d\n",r );
+					long long int r = recvfrom(udpfd,buffer,sizeof(buffer),0,NULL,NULL);
+					//printf("udp_recvd : %d\n",r );
 					if(r<=0)break;
 					if(fwrite(buffer,1,r,f)<=0)
 						break;
+					size-=r;
 
 				}
 			}
 			else{
-				bzero(readbuff,100000);
-				if(read(sockfd,readbuff,100000)<0){
-					printf("Read error\n");
-					exit(-1);
-				}
-				printf("File size: %d Y/N\n",atoi(readbuff));
-				char c=getchar();
-				sprintf(writebuff,"%c",c);
-				if(write(sockfd,writebuff,strlen(writebuff))<0){
-					printf("Write Error clientt\n");
-					exit(-1);
-				}
-				if(c=='N')continue;
-				int r,size=atoi(readbuff);
-				printf("size:%d\n",size);
+				
+				long long int r;
+				long long int size=1ll*atoi(readbuff);
+				//printf("size:%d\n",size);
 				bzero(buffer,1000);
 				while(size>0){
 					r = read(sockfd,buffer,1000);
@@ -134,6 +146,8 @@ int Client(int port){
 			exit(-1);
 		}
 		printf("%s\n",readbuff );
+		fflush(stdout);
+		fflush(stdin);
 	}
 	close(sockfd);
 	return 0;

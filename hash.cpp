@@ -56,7 +56,7 @@ int Hashhandler(char* cmd){
 		return nu;
 	}
 	else{
-		printf("wrong input\n");
-		return 0;
+		//printf("wrong input\n");
+		return -1;
 	}
 }
